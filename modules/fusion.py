@@ -57,6 +57,7 @@ class FusionEngine:
         self._camera_thread = None
         self._camera_lock = threading.Lock()
         self._latest_frame = None
+        self._injected_frame: Optional[np.ndarray] = None
         self._init_camera()
 
         # State Machine tracking
@@ -113,11 +114,18 @@ class FusionEngine:
             except Exception:
                 time.sleep(0.01)
 
+    def set_injected_frame(self, frame_bgr: Optional[np.ndarray]):
+        """Sets a synthetic or uploaded frame to simulate trail camera video."""
+        with self._camera_lock:
+            self._injected_frame = frame_bgr.copy() if frame_bgr is not None else None
+
     def _grab_frame(self) -> Optional[np.ndarray]:
         """Instantly returns the freshest frame from memory in 0.001 ms."""
-        if not self.camera_online:
-            return None
         with self._camera_lock:
+            if self._injected_frame is not None:
+                return self._injected_frame.copy()
+            if not self.camera_online:
+                return None
             return self._latest_frame.copy() if self._latest_frame is not None else None
 
     def _async_caption_worker(self, frame_bgr: np.ndarray, human_detected: bool = False, threat_detected: bool = False):

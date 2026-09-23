@@ -180,6 +180,18 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# ── Engine Singleton via st.cache_resource ────────
+@st.cache_resource
+def get_global_engine() -> FusionEngine:
+    engine = FusionEngine()
+    engine.start()
+    return engine
+
+engine: FusionEngine = get_global_engine()
+
+if "last_alert_id" not in st.session_state:
+    st.session_state.last_alert_id = 0
+
 # ── Sidebar Configuration & Controls ──────────────
 st.sidebar.title("🐾 WildGuard Edge")
 st.sidebar.caption("Autonomous Multimodal Anti-Poaching System")
@@ -205,6 +217,102 @@ elif mode_choice == "Force NIGHT Mode":
 else:
     is_night = config.is_night_mode()
     active_mode = "NIGHT" if is_night else "DAY"
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("📡 Input Feed & Cloud Test Bench")
+
+# Quick Demonstration Presets
+col_demo1, col_demo2 = st.sidebar.columns(2)
+trigger_sim = col_demo1.button("🚨 Simulate Threat", use_container_width=True, help="Simulate a poacher intrusion with chainsaw activity to test multimodal fusion.")
+reset_sim = col_demo2.button("🟢 Nominal State", use_container_width=True, help="Reset to quiet wilderness sanctuary.")
+
+# Video Feed Selection
+video_options = []
+if engine.camera_online:
+    video_options.append("📷 Live Hardware Webcam (Edge Device)")
+video_options.extend([
+    "🚨 Simulated Trail Cam: Poaching Intrusion (Day)",
+    "🌙 Simulated Trail Cam: Night Infrared",
+    "🍃 Simulated Trail Cam: Clear Sanctuary (Nominal)",
+    "📤 Upload Custom Test Frame",
+])
+
+selected_video = st.sidebar.selectbox(
+    "Visual Feed Input",
+    video_options,
+    index=0,
+    help="Select between live camera sensor or interactive wilderness simulations.",
+)
+
+# Audio Feed Selection
+audio_options = [
+    "🎙️ Live Hardware Microphone (Default)",
+    "🚨 Chainsaw Activity (Deforestation Alert)",
+    "⚠️ Distorted Chainsaw Threat",
+    "🪚 Handsaw Acoustic Threat",
+    "🍃 Forest Ambient Nature (Quiet Baseline)",
+    "📤 Upload Custom Audio (.wav)",
+]
+
+selected_audio = st.sidebar.selectbox(
+    "Acoustic Feed Input",
+    audio_options,
+    index=0,
+    help="Select hardware microphone or inject acoustic signatures.",
+)
+
+# Apply simulation buttons if clicked
+if trigger_sim:
+    selected_video = "🚨 Simulated Trail Cam: Poaching Intrusion (Day)"
+    selected_audio = "🚨 Chainsaw Activity (Deforestation Alert)"
+elif reset_sim:
+    selected_video = "🍃 Simulated Trail Cam: Clear Sanctuary (Nominal)"
+    selected_audio = "🍃 Forest Ambient Nature (Quiet Baseline)"
+
+# Route Video
+if selected_video == "📷 Live Hardware Webcam (Edge Device)":
+    engine.set_injected_frame(None)
+elif selected_video == "🚨 Simulated Trail Cam: Poaching Intrusion (Day)":
+    if os.path.exists("demo_images/intruder_day.jpg"):
+        engine.set_injected_frame(cv2.imread("demo_images/intruder_day.jpg"))
+elif selected_video == "🌙 Simulated Trail Cam: Night Infrared":
+    if os.path.exists("demo_images/infrared_night.jpg"):
+        engine.set_injected_frame(cv2.imread("demo_images/infrared_night.jpg"))
+elif selected_video == "🍃 Simulated Trail Cam: Clear Sanctuary (Nominal)":
+    if os.path.exists("demo_images/clear_sanctuary.jpg"):
+        engine.set_injected_frame(cv2.imread("demo_images/clear_sanctuary.jpg"))
+elif selected_video == "📤 Upload Custom Test Frame":
+    uploaded_file = st.sidebar.file_uploader("Upload Image (JPG/PNG)", type=["jpg", "jpeg", "png"])
+    if uploaded_file is not None:
+        file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
+        decoded = cv2.imdecode(file_bytes, 1)
+        if decoded is not None:
+            engine.set_injected_frame(decoded)
+
+# Route Audio
+if selected_audio == "🎙️ Live Hardware Microphone (Default)":
+    engine.audio_cap.set_injected_audio(None)
+elif selected_audio == "🚨 Chainsaw Activity (Deforestation Alert)":
+    if os.path.exists("demo_audio/demo_chainsaw.wav"):
+        w, _ = librosa.load("demo_audio/demo_chainsaw.wav", sr=config.SAMPLE_RATE)
+        engine.audio_cap.set_injected_audio(w)
+elif selected_audio == "⚠️ Distorted Chainsaw Threat":
+    if os.path.exists("demo_audio/demo_distorted_chainsaw.wav"):
+        w, _ = librosa.load("demo_audio/demo_distorted_chainsaw.wav", sr=config.SAMPLE_RATE)
+        engine.audio_cap.set_injected_audio(w)
+elif selected_audio == "🪚 Handsaw Acoustic Threat":
+    if os.path.exists("demo_audio/demo_handsaw.wav"):
+        w, _ = librosa.load("demo_audio/demo_handsaw.wav", sr=config.SAMPLE_RATE)
+        engine.audio_cap.set_injected_audio(w)
+elif selected_audio == "🍃 Forest Ambient Nature (Quiet Baseline)":
+    if os.path.exists("demo_audio/demo_forest_ambient.wav"):
+        w, _ = librosa.load("demo_audio/demo_forest_ambient.wav", sr=config.SAMPLE_RATE)
+        engine.audio_cap.set_injected_audio(w)
+elif selected_audio == "📤 Upload Custom Audio (.wav)":
+    up_aud = st.sidebar.file_uploader("Upload Audio (.WAV)", type=["wav"])
+    if up_aud is not None:
+        w, _ = librosa.load(up_aud, sr=config.SAMPLE_RATE)
+        engine.audio_cap.set_injected_audio(w)
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("🎛️ Sensitivity Calibration")
@@ -276,20 +384,6 @@ st.sidebar.caption(f"**Framework:** PyTorch {torch.__version__} | CUDA {torch.ve
 st.sidebar.caption("**VLM Architecture:** OpenAI CLIP ViT-B/32 + BLIP-base")
 st.sidebar.caption("**Audio Model:** Custom 4-Block Log-Mel CNN")
 st.sidebar.caption("**Object Detector:** Ultralytics YOLOv8n (416x416)")
-
-# ── Engine Singleton via st.cache_resource ────────
-@st.cache_resource
-def get_global_engine() -> FusionEngine:
-    engine = FusionEngine()
-    engine.start()
-    return engine
-
-engine: FusionEngine = get_global_engine()
-# Ensure hardware microphone is active
-engine.audio_cap.set_injected_audio(None)
-
-if "last_alert_id" not in st.session_state:
-    st.session_state.last_alert_id = 0
 
 # Header Command Bar
 col_title, col_stat = st.columns([2.5, 1.5])
@@ -476,7 +570,7 @@ while is_running:
                 else:
                     cam_slot.image(enc_jpg.tobytes(), use_container_width=True)
             else:
-                cam_slot.warning("⚠️ CAMERA OFFLINE — Check physical webcam connection.")
+                cam_slot.info("🌿 **Cloud Portfolio Mode:** Select a simulated trail camera feed or click **🚨 Simulate Threat** in the sidebar to activate real-time detection!")
 
         # 2. Update status and metrics every 15 frames (~1-1.5s) to prevent WebSocket flooding over tunnel
         if loop_count % 15 == 0 or cycle_data.get("alert_fired"):
