@@ -658,8 +658,8 @@ while is_running:
                 f"**AudioCNN:** {aud_ms} ms"
             )
 
-        # 3. Update Waveform Chart every 30 frames (~once per second) to keep WebSocket channel unclogged
-        if loop_count % 30 == 0:
+        # 3. Update Waveform Chart every 10 frames (~1.0s) or immediately on audio threat for snappy telemetry
+        if loop_count % 10 == 0 or cycle_data.get("audio_threat"):
             try:
                 waveform = cycle_data.get("waveform")
                 if waveform is not None and len(waveform) > 0:
