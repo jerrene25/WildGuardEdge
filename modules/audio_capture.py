@@ -1,7 +1,10 @@
 import logging
 import threading
 import time
-import pyaudio
+try:
+    import pyaudio
+except Exception:
+    pyaudio = None
 import numpy as np
 import librosa
 import sys
@@ -27,7 +30,13 @@ class AudioCapture:
         self.window_samples = int(config.AUDIO_WINDOW_SECONDS * self.target_sample_rate)  # 44,100 samples
         self.chunk_size = 1024  # Low latency chunk size
 
-        self.pa = pyaudio.PyAudio()
+        if pyaudio is not None:
+            try:
+                self.pa = pyaudio.PyAudio()
+            except Exception:
+                self.pa = None
+        else:
+            self.pa = None
         self.stream = None
         self.is_active = False
         self.actual_capture_rate = self.target_sample_rate
@@ -47,6 +56,12 @@ class AudioCapture:
 
     def open_stream(self) -> bool:
         """Opens microphone stream and launches background capture thread."""
+        if self.pa is None:
+            logger.info("[AudioCapture] PyAudio not available (cloud environment). Physical mic disabled.")
+            self.stream = None
+            self.is_active = False
+            return False
+
         try:
             # First attempt opening directly at 22050 Hz for zero-resampling performance
             try:

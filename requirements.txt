@@ -9,9 +9,8 @@ regex
 streamlit
 opencv-python-headless
 psutil
-pyaudio
 librosa
 soundfile
 numba
 pandas
-clip @ git+https://github.com/openai/CLIP.git
+git+https://github.com/openai/CLIP.git
